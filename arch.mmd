@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant Caller
+    participant Telnyx/Twilio
+    participant FastAPI (main.py)
+    participant VoiceBot (bot.py)
+    participant Deepgram STT
+    participant Groq LLM
+    participant Deepgram TTS
+
+    Caller->>Telnyx/Twilio: Dials phone number
+    Telnyx/Twilio->>FastAPI: POST /incoming-call/telnyx
+    FastAPI-->>Telnyx/Twilio: TeXML/TwiML (connect to WebSocket)
+    Telnyx/Twilio->>FastAPI: WebSocket /media-stream/telnyx
+    FastAPI->>VoiceBot: Create & start bot
+    VoiceBot->>Deepgram STT: Open WebSocket for live transcription
+
+    loop Real-time conversation
+        Caller->>Telnyx/Twilio: Speaks
+        Telnyx/Twilio->>VoiceBot: Audio chunks (mulaw, base64)
+        VoiceBot->>Deepgram STT: Forward raw audio bytes
+        Deepgram STT-->>VoiceBot: Transcript (final)
+        VoiceBot->>Groq LLM: Send transcript + conversation history
+        Groq LLM-->>VoiceBot: AI response text
+        VoiceBot->>Deepgram TTS: POST text → get mulaw audio
+        Deepgram TTS-->>VoiceBot: Audio bytes
+        VoiceBot->>Telnyx/Twilio: Send base64 audio back
+        Telnyx/Twilio->>Caller: Hears AI response
+    end
